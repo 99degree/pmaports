@@ -9,6 +9,7 @@ subpackages="
 	$pkgname-modem
 	$pkgname-venus
 	$pkgname-wlan
+	$pkgname-gpu
 	"
 url="https://github.com/99degree/firmware-xiaomi-miatoll"
 arch="aarch64"
@@ -66,6 +67,13 @@ wlan() {
 	pkgdesc="Xiaomi Miatoll wlan firmware"
 
 	install -Dm644 "$builddir"/wlanmdsp.mbn -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+gpu() {
+	pkgdesc="Xiaomi Miatoll gpu firmware"
+
+	install -Dm644 "$builddir"/a615_zap.mbn -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
