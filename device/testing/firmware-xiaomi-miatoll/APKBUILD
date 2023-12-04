@@ -15,7 +15,7 @@ url="https://github.com/99degree/firmware-xiaomi-miatoll"
 arch="aarch64"
 license="proprietary"
 options="!check !strip !archcheck !tracedeps pmb:cross-native"
-_commit="2698fb2fd4f3d593e72edc1e4f5bc6cf49e5945e"
+_commit="fb50cf746d65784164de624ed414290b3a77dacf"
 source="$pkgname-$_commit.tar.gz::$url/archive/$_commit/$pkgname-$_commit.tar.gz"
 builddir="$srcdir/$pkgname-$_commit"
 
