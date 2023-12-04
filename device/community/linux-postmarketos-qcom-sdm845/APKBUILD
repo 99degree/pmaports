@@ -5,8 +5,8 @@
 
 _flavor="postmarketos-qcom-sdm845"
 pkgname=linux-$_flavor
-pkgver=6.5.5
-pkgrel=0
+pkgver=6.6.3
+pkgrel=1
 pkgdesc="Mainline Kernel fork for SDM845 devices"
 arch="aarch64"
 _carch="arm64"
@@ -18,7 +18,7 @@ options="!check !tracedeps
 makedepends="bash bison findutils flex installkernel openssl-dev perl zstd"
 
 _config="config-$_flavor.$arch"
-_tag="sdm845-6.5.5"
+_tag="sdm845-6.6.3-r3"
 
 # Source
 source="
@@ -39,8 +39,19 @@ build() {
 }
 
 package() {
-	install -Dm644 "$builddir/arch/$_carch/boot/Image.gz" \
-		"$pkgdir/boot/vmlinuz"
+	if [ -e "$builddir/arch/$_carch/boot/vmlinuz.efi" ]; then
+		# ZBOOT EFI decompressor for EFI booting
+		install -Dm644 "$builddir/arch/$_carch/boot/vmlinuz.efi" \
+			"$pkgdir/boot/linux.efi"
+
+		# Old GZIP'd kernel image for boot.img compatibility
+		install -Dm644 "$builddir/arch/$_carch/boot/vmlinuz" \
+			"$pkgdir/boot/vmlinuz"
+	else
+		echo "WARNING: CONFIG_ZBOOT not enabled!"
+		install -Dm644 "$builddir/arch/$_carch/boot/Image.gz" \
+			"$pkgdir/boot/vmlinuz"
+	fi
 
 	make modules_install dtbs_install \
 		ARCH="$_carch" \
@@ -55,6 +66,6 @@ package() {
 }
 
 sha512sums="
-97d7c4dad9f780ea34c875cd32cfc7bb3d9c5ad9c779f10a079db3ed9b5250aaf4641b11266772b41a38004ea6e1b65200bf75bd410e682206d0ddc81ab47588  linux-sdm845-6.5.5.tar.gz
-d1f22202d12a6ba169f261992f4708f6c4957e7483ce6b55d668a019a50a4d64fc4d7a2d862bb290d8f667ca4107fa878133e61e133b518d74cfe4eba1b8d4b8  config-postmarketos-qcom-sdm845.aarch64
+621ee00668c8739503042074615e95949e55124f48c488de83bcce733fa4b140576f26ab37d47a886136f8167832751036905a18dbb7455649b146bb3dfb22cf  linux-sdm845-6.6.3-r3.tar.gz
+40fb1a8c65c8449e42347330fe6a54ced5fe3d10ad0c64f5949519e141180dadec16f85afcff909e3f29b952dc2b7d490710b9abdc99b2a88edc46f89315146b  config-postmarketos-qcom-sdm845.aarch64
 "

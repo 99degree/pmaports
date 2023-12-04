@@ -561,6 +561,23 @@ setup_usb_network_android() {
 	echo "1" >"$SYS/enable"
 }
 
+
+setup_usb_configfs_udc() {
+	# Check if there's an USB Device Controller
+	local _udc_dev
+	_udc_dev=$(ls /sys/class/udc)
+	if [ -z "$_udc_dev" ]; then
+		echo "  No USB Device Controller available"
+		return
+	fi
+
+	# Remove any existing UDC to avoid "write error: Resource busy" when setting UDC again
+	echo "" > /config/usb_gadget/g1/UDC || echo "  Couldn't write to clear UDC"
+	# Link the gadget instance to an USB Device Controller. This activates the gadget.
+	# See also: https://github.com/postmarketOS/pmbootstrap/issues/338
+	echo "$_udc_dev" > /config/usb_gadget/g1/UDC || echo "  Couldn't write new UDC"
+}
+
 setup_usb_network_configfs() {
 	# See: https://www.kernel.org/doc/Documentation/usb/gadget_configfs.txt
 	CONFIGFS=/config/usb_gadget
@@ -574,7 +591,8 @@ setup_usb_network_configfs() {
 	usb_idVendor="${deviceinfo_usb_idVendor:-0x18D1}"   # default: Google Inc.
 	usb_idProduct="${deviceinfo_usb_idProduct:-0xD001}" # default: Nexus 4 (fastboot)
 	usb_serialnumber="${deviceinfo_usb_serialnumber:-postmarketOS}"
-	usb_network_function="${deviceinfo_usb_network_function:-rndis.usb0}"
+	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
+	usb_network_function_fallback="rndis.usb0"
 
 	echo "  Setting up an USB gadget through configfs"
 	# Create an usb gadet configuration
@@ -592,8 +610,15 @@ setup_usb_network_configfs() {
 	echo "$deviceinfo_name"         > "$CONFIGFS/g1/strings/0x409/product"
 
 	# Create network function.
-	mkdir $CONFIGFS/g1/functions/"$usb_network_function" \
-		|| echo "  Couldn't create $CONFIGFS/g1/functions/$usb_network_function"
+	if ! mkdir $CONFIGFS/g1/functions/"$usb_network_function"; then
+		echo "  Couldn't create $CONFIGFS/g1/functions/$usb_network_function"
+		# Try the fallback function next
+		if mkdir $CONFIGFS/g1/functions/"$usb_network_function_fallback"; then
+			usb_network_function="$usb_network_function_fallback"
+		else
+			echo "  Couldn't create $CONFIGFS/g1/functions/$usb_network_function_fallback"
+		fi
+	fi
 
 	# Create configuration instance for the gadget
 	mkdir $CONFIGFS/g1/configs/c.1 \
@@ -607,16 +632,7 @@ setup_usb_network_configfs() {
 	ln -s $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't symlink $usb_network_function"
 
-	# Check if there's an USB Device Controller
-	if [ -z "$(ls /sys/class/udc)" ]; then
-		echo "  No USB Device Controller available"
-		return
-	fi
-
-	# Link the gadget instance to an USB Device Controller. This activates the gadget.
-	# See also: https://github.com/postmarketOS/pmbootstrap/issues/338
-	# shellcheck disable=SC2005
-	echo "$(ls /sys/class/udc)" > $CONFIGFS/g1/UDC || echo "  Couldn't write UDC"
+	setup_usb_configfs_udc
 }
 
 setup_usb_network() {
