@@ -3,13 +3,13 @@ pkgver=1
 pkgrel=0
 pkgdesc="Firmware for Xiaomi Miatoll"
 subpackages="
-	$pkgname-adsp
-	$pkgname-cdsp
-	$pkgname-ipa
-	$pkgname-modem
-	$pkgname-venus
-	$pkgname-wlan
-	$pkgname-gpu
+	$pkgname-adsp:adsp
+	$pkgname-cdsp:cdsp
+	$pkgname-ipa:ipa
+	$pkgname-modem:modem
+	$pkgname-venus:venus
+	$pkgname-wlan:wlan
+	$pkgname-gpu:gpu
 	"
 url="https://github.com/99degree/firmware-xiaomi-miatoll"
 arch="aarch64"
@@ -27,6 +27,8 @@ package() {
 adsp() {
 	pkgdesc="Xiaomi Miatoll adsp firmware"
 
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
 	install -Dm644 "$builddir"/adsp* -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
@@ -34,12 +36,16 @@ adsp() {
 cdsp() {
 	pkgdesc="Xiaomi Miatoll cdsp firmware"
 
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
 	install -Dm644 "$builddir"/cdsp* -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
 ipa() {
 	pkgdesc="Xiaomi Miatoll ipa firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
 	install -Dm644 "$builddir"/ipa_fws.* -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
@@ -59,6 +65,8 @@ modem() {
 venus() {
 	pkgdesc="Xiaomi Miatoll venus firmware"
 
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
 	install -Dm644 "$builddir"/venus.mbn -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
@@ -66,12 +74,16 @@ venus() {
 wlan() {
 	pkgdesc="Xiaomi Miatoll wlan firmware"
 
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
 	install -Dm644 "$builddir"/wlanmdsp.mbn -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
 gpu() {
 	pkgdesc="Xiaomi Miatoll gpu firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
 	install -Dm644 "$builddir"/a615_zap.mbn -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
