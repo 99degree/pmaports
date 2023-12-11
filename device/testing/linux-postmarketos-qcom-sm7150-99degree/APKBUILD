@@ -1,0 +1,57 @@
+# Maintainer: Danila Tikhonov <danila@jiaxyga.com>
+# Co-Maintainer: David Wronek <davidwronek@gmail.com>
+
+_flavor="postmarketos-qcom-sm7150-99degree"
+pkgname=linux-$_flavor
+pkgver=6.7.0
+pkgrel=0
+pkgdesc="Mainline Kernel fork for SM7150 devices"
+arch="aarch64"
+_carch="arm64"
+url="https://github.com/99degree/linux"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps
+	pmb:cross-native
+	pmb:kconfigcheck-nftables
+	"
+makedepends="bison findutils flex installkernel openssl-dev perl"
+
+_tag="$pkgver-r$pkgrel"
+
+# Source
+source="
+	$pkgname-v$_tag.tar.gz::$url/archive/v$_tag.tar.gz
+	config-$_flavor.$arch
+"
+builddir="$srcdir/linux-$_tag"
+
+prepare() {
+	default_prepare
+	cp "$srcdir/config-$_flavor.$arch" .config
+}
+
+build() {
+	unset LDFLAGS
+	make ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-$_flavor"
+}
+
+package() {
+	mkdir -p "$pkgdir"/boot
+	make zinstall modules_install dtbs_install \
+		ARCH="$_carch" \
+		INSTALL_PATH="$pkgdir"/boot/ \
+		INSTALL_MOD_PATH="$pkgdir" \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
+	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
+
+	install -D "$builddir"/include/config/kernel.release \
+		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
+}
+
+
+sha512sums="
+9f35c6d92098d97e960bf702503581ad1f44bb4a44c9cf4ed02a84693cebcf140bf19811215c9fbedb21be86131aa55da39621dfc5524dfbebac7c4369e97fce  linux-postmarketos-qcom-sm7150-99degree-v6.7.0-r0.tar.gz
+293b4a84f4ea0774e552faf41c53232245995948183df10ba0e90834b1057210e1706832b60bf8a639024e840f8ac7ea173829faae00a71b64bbb28cf81d202c  config-postmarketos-qcom-sm7150-99degree.aarch64
+"
