@@ -994,57 +994,6 @@ export_logs() {
 	setup_usb_configfs_udc
 }
 
-# Even adbd might not be available for all setup,
-# run this function might also no harm and really
-# free up some memory.
-clean_up_prepare_switch_root() {
-	# mount -rprivate /dev
-	# mount -
-	# return;
-echo ---------------
-	# Kill the adb daemon too and let openRC handdle it again
-	#killall adbd 2>/dev/null
-
-	# As same to LOS recovery init.rc did.
-	#echo "" > $CONFIGFS/g1/UDC
-	#rm "$CONFIGFS"/g1/configs/c.1/f_*
-	# Created by NCM
-	# Created by ADB`
-	#rmdir "$CONFIGFS"/g1/functions/*
-	#rm "$CONFIGFS"/g1/os_desc/c.*
-	#rm "$CONFIGFS"/g1/os_desc/ff*
-	#rm "$CONFIGFS"/g1/os_desc/ncm*
-	#rm "$CONFIGFS"/g1/os_desc/rndi*
-
-	# setup gadget once again since previously expected NCM is carrying
-	# over after switch_root
-	#setup_usb_network_android
-	#setup_usb_network_configfs
-	
-	# Mount once again and let mount move do..
-	# mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
-	# Define needed mount point for move
-	mts="dev"
-	mts="${mts} proc"
-	mts="${mts} sys"
-	mts="${mts} run"
-	mts="${mts} config"
-	# Additional mount pt that might supported later
-	#mts="${mts} dev/usb-ffs"
-	#mts="${mts} config"
-
-	# Mount move to new root before switch_root
-	# This technique is happened in Android 1st->2nd stage init
-	for mtp in ${mts}; do
-		#mount --move /$mtp /sysroot/$mtp
-#		|| umount /$mtp
-		#mount -rprivate /$mtp
-		echo""
-	done
-	
-	#cat /sysroot/proc/mounts
-}
-
 fail_halt_boot() {
 	export_logs
 	echo "Looping forever"
