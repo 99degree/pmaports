@@ -2,6 +2,7 @@
 # shellcheck disable=SC1091
 
 IN_CI="false"
+PMOS_USB_REMAIN_ACTIVE="false"
 
 [ -e /hooks/10-verbose-initfs.sh ] && set -x
 
@@ -16,8 +17,9 @@ VERSION="${VERSION:-unknown}"
 
 # This is set during packaging and is used when triaging bug reports
 INITRAMFS_PKG_VERSION="<<INITRAMFS_PKG_VERSION>>"
-
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+# Hacky to preserve working root
 /bin/busybox --install -s
 /bin/busybox-extras --install -s
 
@@ -85,11 +87,22 @@ mount_boot_partition /sysroot/boot "rw"
 init="/sbin/init"
 setup_bootchart2
 
+#sleep 100 && echo b > /proc/sysrq-trigger || echo b > /sysroot/proc/sysrq-trigger
+
 # Switch root
 killall telnetd mdev udevd msm-fb-refresher 2>/dev/null
 
 # shellcheck disable=SC2093
-exec switch_root /sysroot "$init"
+
+# OpenRC seemed not mounting dev properly so lets help it out.
+mount -t devtmpfs -o mode=0755,nosuid dev /sysroot/dev || echo "Couldn't mount /dev"
+if [ "$PMOS_USB_REMAIN_ACTIVE" = "false" ]; then
+	exec switch_root /sysroot "$(init)"
+else
+	cd /sysroot
+	pivot_root . /root
+	exec chroot . /sbin/init
+fi
 
 echo "ERROR: switch_root failed!"
 echo "Looping forever. Install and use the debug-shell hook to debug this."

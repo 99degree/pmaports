@@ -1,0 +1,72 @@
+# Maintainer: Jens Reidel <adrian@travitia.xyz>
+# Reference: <https://postmarketos.org/devicepkg>
+
+pkgname=device-xiaomi-miatoll
+pkgdesc="Xiaomi Miatoll"
+pkgver=1
+pkgrel=8
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	make-dynpart-mappings
+	mesa-vulkan-freedreno
+	mkbootimg
+	postmarketos-base
+	postmarketos-update-kernel
+	firmware-xiaomi-miatoll
+	soc-qcom-sm7150
+	soc-qcom-sm7150-spmi-vibrator-feedbackd-rules
+	soc-qcom-sm7150-unl0kr-msmdrmfb-quirk
+	linux-postmarketos-qcom-sm7150
+	nano
+"
+makedepends="devicepkg-dev"
+source="
+	deviceinfo
+	modules-initfs
+"
+
+subpackages="
+	$pkgname-nonfree-firmware:nonfree_firmware
+	$pkgname-camera:camera
+"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+}
+
+nonfree_firmware() {
+	pkgdesc="Firmware for GPU, Audio, Modem, WiFi, etc."
+	depends="
+		firmware-xiaomi-miatoll-adsp
+		firmware-xiaomi-miatoll-cdsp
+		firmware-xiaomi-miatoll-ipa
+		firmware-xiaomi-miatoll-modem
+		firmware-xiaomi-miatoll-venus
+		firmware-xiaomi-miatoll-wlan
+		firmware-xiaomi-miatoll-gpu
+		firmware-xiaomi-miatoll-misc
+		soc-qcom-sm7150-nonfree-firmware
+		"
+	mkdir -p "$subpkgdir"
+}
+
+camera() {
+        install_if="$pkgname=$pkgver-r$pkgrel postmarketos-default-camera"
+        depends="megapixels
+		v4l-utils
+		vlc
+		"
+        mkdir -p "$subpkgdir"
+}
+
+sha512sums="
+5b4eaec442ce2a6eda2a432b5968e9402ebf11656368e04243bd9cf5741ad2e0fbdda147475b04b33b4f7cb5db535209a0976199d9af55016d502f37ca96a20a  deviceinfo
+86222f79c8df82290c051c7e2cb76c30ab8c98cf2d00689cee17543ad66da38c82b139a3c89b27575afaad4198e042fe41cd124b642ab1e0eebd7dad7468c8b6  modules-initfs
+"

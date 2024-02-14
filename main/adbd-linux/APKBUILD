@@ -1,0 +1,38 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Sören Tempel <soeren+alpine@soeren-tempel.net>
+pkgname=adbd-linux
+pkgver=1.0.1
+pkgrel=3
+pkgdesc="Android adbd daemon tool for device"
+url="https://github.com/99degree/adbd-linux"
+# s390x, ppc64le: Unsupported by vendored BoringSSL
+#arch="all !s390x !ppc64le"
+
+# since local environment cant test this so strictly for arm64 only.
+arch="aarch64"
+license="Apache-2.0 MIT"
+options="net !check" # upstream doesn't have a test suite
+depends=""
+#makedepends="pcre2-dev linux-headers libusb-dev gtest-dev go perl cmake
+#	protobuf-dev brotli-dev zstd-dev lz4-dev samurai abseil-cpp-dev"
+#subpackages="$pkgname-bash-completion:bashcomp:noarch"
+makedepends="binutils"
+_commit="faa8a05a13c7b92a635b45feaa7b9f3ac321456e"
+source="adbd-linux-$_commit.tar.gz::https://github.com/99degree/adbd-linux/archive/$_commit.tar.gz"
+
+#https://github.com/99degree/adbd-linux/archive/refs/tags/1.0.1.tar.gz
+
+build() {
+	RANLIB=aarch64-alpine-linux-musl-ranlib AR=aarch64-alpine-linux-musl-ar CXX=aarch64-alpine-linux-musl-g++ CC=aarch64-alpine-linux-musl-gcc make adb/adbd
+}
+
+package() {
+	install -Dm755 adb/adbd "$pkgdir"/usr/bin/adbd	
+}
+
+#bashcomp() {
+#}
+
+sha512sums="
+08d3f586bb0192001456539bc93c9314788d3752caa60d38766447800bbe5063f2409bc2bf22f330b2a41f07d3c2111f42632e870b04b85249f0886134057991  adbd-linux-faa8a05a13c7b92a635b45feaa7b9f3ac321456e.tar.gz
+"

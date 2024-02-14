@@ -4,12 +4,19 @@ ROOT_PARTITION_UNLOCKED=0
 ROOT_PARTITION_RESIZED=0
 PMOS_BOOT=""
 PMOS_ROOT=""
+CONFIGFS="/sys/kernel/config/usb_gadget"
+USB_FFS="/dev/usb-ffs"
+#USB_FFS=/sys/kernel/usb-ffs
+#USB_FFS=/usb-ffs
 
 # Redirect stdout and stderr to logfile
 setup_log() {
 	local log_to_console=""
 
 	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/cmdline && log_to_console="true"
+	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/bootconfig && log_to_console="true"
+	grep -q PMOS_USB_REMAIN_ACTIVE /proc/cmdline && PMOS_USB_REMAIN_ACTIVE="true"
+	grep -q PMOS_USB_REMAIN_ACTIVE /proc/bootconfig && PMOS_USB_REMAIN_ACTIVE="true"
 
 	echo "### postmarketOS initramfs ###"
 
@@ -19,8 +26,7 @@ setup_log() {
 	fi
 
 	# Start redirect
-	exec >/pmOS_init.log 2>&1
-	echo "### postmarketOS initramfs ###"
+	exec > /pmOS_init.log 2>&1
 
 	# Pipe logs to console if PMOS_NO_OUTPUT_REDIRECT is set
 	if [ -n "$log_to_console" ]; then
@@ -30,18 +36,52 @@ setup_log() {
 }
 
 mount_proc_sys_dev() {
+	mkdir -p /proc
+	mkdir -p /tmp
+	mkdir -p /sys
+	mkdir -p /dev
+	mkdir -p /run
+
 	# mdev
 	mount -t proc -o nodev,noexec,nosuid proc /proc || echo "Couldn't mount /proc"
 	mount -t sysfs -o nodev,noexec,nosuid sysfs /sys || echo "Couldn't mount /sys"
-	mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
+	# Now deploy as tmpfs for containerized
+	mount -t tmpfs -o mode=0755,nosuid none /dev || echo "Couldn't mount /dev"
 	mount -t tmpfs -o nosuid,nodev,mode=0755 run /run || echo "Couldn't mount /run"
 
-	mkdir /config
-	mount -t configfs -o nodev,noexec,nosuid configfs /config
+	mount -t pstore pstore /sys/fs/pstore
+
+	# This is location is more intended
+	mkdir -p /sys/kernel/config || echo "Couldn't mkdir /sys/kernel/config";
+
+	mount -t configfs -o nodev,noexec,nosuid,rw,relatime configfs /sys/kernel/config \
+		|| echo "Couldn't mount /sys/kernel/config"
 
 	# /dev/pts (needed for telnet)
 	mkdir -p /dev/pts
 	mount -t devpts devpts /dev/pts
+
+	# Manually create console node
+	#mknod /dev/tty c 5 0
+	#mknod /dev/tty0 c 4 0
+	#mknod /dev/tty1 c 1 0
+	#mknod /dev/console c 5 1
+	mknod /dev/kmsg c 1 11
+	mknod /dev/null c 1 3
+	mknod /dev/fb0 c 29 0
+
+	ln -sf /proc/self/fd/0 /dev/stdin
+	ln -sf /proc/self/fd/1 /dev/stdout
+	ln -sf /proc/self/fd/2 /dev/stderr
+
+	ln -sf /proc/self/fd/1 /dev/console
+	ln -sf /proc/self/fd/1 /dev/tty
+
+	mkdir -p /tmp
+	mount -t tmpfs tmpfs /tmp
+
+	mkdir /mnt
+	mount -t tmpfs tmpfs /mnt
 }
 
 setup_firmware_path() {
@@ -63,9 +103,10 @@ setup_firmware_path() {
 load_modules() {
 	local file="$1"
 	local modules="$2"
-	[ -f "$file" ] && modules="$modules $(grep -v ^\# "$file")"
-	# shellcheck disable=SC2086
-	modprobe -a $modules
+	if [ -f "$file" ] && modules="$modules $(grep -v ^\# "$file")"; then
+		# shellcheck disable=SC2086
+		modprobe -a $modules
+	fi
 }
 
 setup_mdev() {
@@ -585,7 +626,9 @@ setup_usb_configfs_udc() {
 	# Check if there's an USB Device Controller
 	local _udc_dev="${deviceinfo_usb_network_udc:-}"
 	if [ -z "$_udc_dev" ]; then
-		_udc_dev=$(ls /sys/class/udc)
+		# This new grep is to workaround some setup with 2 UDC
+		# and one is namely "dummy_udc.0"
+		_udc_dev=$(ls /sys/class/udc | grep usb)
 		if [ -z "$_udc_dev" ]; then
 			echo "  No USB Device Controller available"
 			return
@@ -593,35 +636,53 @@ setup_usb_configfs_udc() {
 	fi
 
 	# Remove any existing UDC to avoid "write error: Resource busy" when setting UDC again
-	echo "" > /config/usb_gadget/g1/UDC || echo "  Couldn't write to clear UDC"
+	[ ! -z "$CONFIGFS/g1/UDC" ] || echo "" > $CONFIGFS/g1/UDC || echo "  Couldn't write to clear UDC"
+
 	# Link the gadget instance to an USB Device Controller. This activates the gadget.
 	# See also: https://gitlab.com/postmarketOS/pmbootstrap/issues/338
-	echo "$_udc_dev" > /config/usb_gadget/g1/UDC || echo "  Couldn't write new UDC"
+	echo "$_udc_dev" > $CONFIGFS/g1/UDC || echo "  Couldn't write new UDC"
 }
 
 # $1: if set, skip writing to the UDC
 setup_usb_network_configfs() {
 	# See: https://www.kernel.org/doc/Documentation/usb/gadget_configfs.txt
-	CONFIGFS=/config/usb_gadget
 	local skip_udc="$1"
 
 	if ! [ -e "$CONFIGFS" ]; then
-		echo "  /config/usb_gadget does not exist, skipping configfs usb gadget"
+		echo "  $CONFIGFS does not exist, skipping configfs usb gadget"
 		return
 	fi
 
 	# Default values for USB-related deviceinfo variables
 	usb_idVendor="${deviceinfo_usb_idVendor:-0x18D1}"   # default: Google Inc.
-	usb_idProduct="${deviceinfo_usb_idProduct:-0xD001}" # default: Nexus 4 (fastboot)
+	usb_idProduct="${deviceinfo_usb_idProduct:-0x4EEE}" # default: Nexus 4 (fastboot)
 	usb_serialnumber="${deviceinfo_usb_serialnumber:-postmarketOS}"
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
+	usb_ffs_function="ffs.adb"
+
+	if [ -e "$CONFIGFS/g1/UDC" ]; then
+		echo "" > $CONFIGFS/g1/UDC
+		# || echo "  Couldn't write to clear UDC"
+	fi
 
 	echo "  Setting up an USB gadget through configfs"
 	# Create an usb gadet configuration
 	mkdir $CONFIGFS/g1 || echo "  Couldn't create $CONFIGFS/g1"
 	echo "$usb_idVendor"  > "$CONFIGFS/g1/idVendor"
 	echo "$usb_idProduct" > "$CONFIGFS/g1/idProduct"
+
+	# Make it a composite class device
+	# from https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/supported-usb-classes
+	# {4d36e972-e325-11ce-bfc1-08002be10318}
+	# Supports SubClass 04h and Protocol 01h
+	#
+	# Actual test shows no more composite device. So fill bDeviceSubClass by 0x2 is best fit.
+	echo 0x0100 > "$CONFIGFS/g1/bcdDevice"
+	echo 0x0200 > "$CONFIGFS/g1/bcdUSB"
+	echo 0xEF > "$CONFIGFS/g1/bDeviceClass"
+	echo 0x02 > "$CONFIGFS/g1/bDeviceSubClass"
+	echo 0x01 > "$CONFIGFS/g1/bDeviceProtocol"
 
 	# Create english (0x409) strings
 	mkdir $CONFIGFS/g1/strings/0x409 || echo "  Couldn't create $CONFIGFS/g1/strings/0x409"
@@ -632,7 +693,7 @@ setup_usb_network_configfs() {
 	# shellcheck disable=SC2154
 	echo "$deviceinfo_name"         > "$CONFIGFS/g1/strings/0x409/product"
 
-	# Create network function.
+	# Create network ncm function.
 	if ! mkdir $CONFIGFS/g1/functions/"$usb_network_function"; then
 		echo "  Couldn't create $CONFIGFS/g1/functions/$usb_network_function"
 		# Try the fallback function next
@@ -643,6 +704,11 @@ setup_usb_network_configfs() {
 		fi
 	fi
 
+	# Create ffs adb function.
+	if ! mkdir $CONFIGFS/g1/functions/"$usb_ffs_function"; then
+		echo "  Couldn't create $CONFIGFS/g1/functions/$usb_ffs_function"
+	fi
+
 	# Create configuration instance for the gadget
 	mkdir $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't create $CONFIGFS/g1/configs/c.1"
@@ -651,9 +717,47 @@ setup_usb_network_configfs() {
 	echo "USB network" > $CONFIGFS/g1/configs/c.1/strings/0x409/configuration \
 		|| echo "  Couldn't write configration name"
 
+	echo 120 > $CONFIGFS/g1/configs/c.1/MaxPower \
+                || echo "  Couldn't write MaxPower"
+
+	echo 1 > $CONFIGFS/g1/os_desc/use \
+		|| echo "  Couldn't write $CONFIGFS/g1/configs/c.1/os_desc/use"
+
+	echo "0xcd" > $CONFIGFS/g1/os_desc/b_vendor_code \
+		|| echo "  Couldn't write $CONFIGFS/g1/configs/c.1/os_desc/b_vendor_code"
+
+	echo "MSFT100" > $CONFIGFS/g1/os_desc/qw_sign \
+               || echo "  Couldn't write $CONFIGFS/g1/os_desc/qw_sign"
+
+	# Link the os_desc instance to the configuration
+	# The trick is to remove previous symlink and create new one.
+	# This trick is to workaround missing kernel functionfs driver bind()
+	ln -sf $(realpath "$CONFIGFS/g1/configs/c.1") \
+		$CONFIGFS/g1/os_desc/ \
+		|| echo "  Couldn't symlink os_desc"
+
 	# Link the network instance to the configuration
-	ln -s $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
+	# The trick is to remove previous symlink and create new one.
+	# This trick is to workaround missing kernel functionfs driver bind()
+	ln -sf $(realpath "$CONFIGFS/g1/functions/$usb_network_function") "$CONFIGFS/g1/configs/c.1/f_$usb_network_function" \
 		|| echo "  Couldn't symlink $usb_network_function"
+
+if [ "$PMOS_USB_REMAIN_ACTIVE" = "false" ]; then
+	echo ""
+else
+	ln -sf $(realpath "$CONFIGFS/g1/functions/$usb_ffs_function") "$CONFIGFS/g1/configs/c.1/f_$usb_ffs_function" \
+		|| echo "  Couldn't symlink $usb_ffs_function"
+
+	# Specially for ADB, cant move early. should be right here.
+	mkdir -p $ADB_ROOT/$USB_FFS \
+		|| echo "  Couldn't create $USB_FFS"
+
+	mkdir -p $ADB_ROOT/$USB_FFS/adb \
+		|| echo "  Couldn't create $USB_FFS/adb"
+
+	mount -o uid=2000,gid=2000 -t functionfs adb $USB_FFS/adb
+	exec /bin/adbd --device_banner=device &
+fi
 
 	# If an argument was supplied then skip writing to the UDC (only used for mass storage
 	# log recovery)
@@ -692,8 +796,8 @@ start_unudhcpd() {
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
 	INTERFACE="$(
-		cat "/config/usb_gadget/g1/functions/$usb_network_function/ifname" 2>/dev/null ||
-		cat "/config/usb_gadget/g1/functions/$usb_network_function_fallback/ifname" 2>/dev/null ||
+		cat "$CONFIGFS/g1/functions/$usb_network_function/ifname" 2>/dev/null ||
+		cat "$CONFIGFS/g1/functions/$usb_network_function_fallback/ifname" 2>/dev/null ||
 		echo ''
 	)"
 	if [ -n "$INTERFACE" ]; then
@@ -864,7 +968,7 @@ create_logs_disk() {
 export_logs() {
 	local loop_dev=""
 	usb_mass_storage_function="mass_storage.0"
-	active_udc="$(cat /config/usb_gadget/g1/UDC)"
+	active_udc="$(cat $CONFIGFS/g1/UDC)"
 
 	loop_dev="$(losetup -f)"
 
@@ -877,7 +981,7 @@ export_logs() {
 		setup_usb_network_configfs "skip_udc"
 	else
 		# Unset UDC
-		echo "" > /config/usb_gadget/g1/UDC
+		echo "" > $CONFIGFS/g1/UDC
 	fi
 
 	mkdir "$CONFIGFS"/g1/functions/"$usb_mass_storage_function" || return
@@ -888,6 +992,57 @@ export_logs() {
 		"$CONFIGFS"/g1/configs/c.1 || return
 
 	setup_usb_configfs_udc
+}
+
+# Even adbd might not be available for all setup,
+# run this function might also no harm and really
+# free up some memory.
+clean_up_prepare_switch_root() {
+	# mount -rprivate /dev
+	# mount -
+	# return;
+echo ---------------
+	# Kill the adb daemon too and let openRC handdle it again
+	#killall adbd 2>/dev/null
+
+	# As same to LOS recovery init.rc did.
+	#echo "" > $CONFIGFS/g1/UDC
+	#rm "$CONFIGFS"/g1/configs/c.1/f_*
+	# Created by NCM
+	# Created by ADB`
+	#rmdir "$CONFIGFS"/g1/functions/*
+	#rm "$CONFIGFS"/g1/os_desc/c.*
+	#rm "$CONFIGFS"/g1/os_desc/ff*
+	#rm "$CONFIGFS"/g1/os_desc/ncm*
+	#rm "$CONFIGFS"/g1/os_desc/rndi*
+
+	# setup gadget once again since previously expected NCM is carrying
+	# over after switch_root
+	#setup_usb_network_android
+	#setup_usb_network_configfs
+	
+	# Mount once again and let mount move do..
+	# mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
+	# Define needed mount point for move
+	mts="dev"
+	mts="${mts} proc"
+	mts="${mts} sys"
+	mts="${mts} run"
+	mts="${mts} config"
+	# Additional mount pt that might supported later
+	#mts="${mts} dev/usb-ffs"
+	#mts="${mts} config"
+
+	# Mount move to new root before switch_root
+	# This technique is happened in Android 1st->2nd stage init
+	for mtp in ${mts}; do
+		#mount --move /$mtp /sysroot/$mtp
+#		|| umount /$mtp
+		#mount -rprivate /$mtp
+		echo""
+	done
+	
+	#cat /sysroot/proc/mounts
 }
 
 fail_halt_boot() {
