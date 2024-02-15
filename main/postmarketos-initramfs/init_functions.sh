@@ -44,6 +44,9 @@ mount_proc_sys_dev() {
 	mkdir $CONFIGFS_DIR
 	mount -t configfs -o nodev,noexec,nosuid configfs $CONFIGFS_DIR
 
+	# Mount pstore aas well so we can get kmsg from last fail boot over there
+	mount -t pstore pstore /sys/fs/pstore
+
 	# /dev/pts (needed for telnet)
 	mkdir -p /dev/pts
 	mount -t devpts devpts /dev/pts
