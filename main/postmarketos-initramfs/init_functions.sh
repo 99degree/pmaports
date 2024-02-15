@@ -582,7 +582,7 @@ setup_usb_network_android() {
 	echo "  Setting up an USB gadget through android_usb"
 
 	usb_idVendor="$(echo "${deviceinfo_usb_idVendor:-0x18D1}" | sed "s/0x//g")"	# default: Google Inc.
-	usb_idProduct="$(echo "${deviceinfo_usb_idProduct:-0xD00F}" | sed "s/0x//g")"	# default: Nexus 4 (fastboot)
+	usb_idProduct="$(echo "${deviceinfo_usb_idProduct:-0xD001}" | sed "s/0x//g")"	# default: Nexus 4 (fastboot)
 
 	# Do the setup
 	echo "0" >"$SYS/enable"
@@ -626,7 +626,10 @@ setup_usb_network_configfs() {
 
 	# Default values for USB-related deviceinfo variables
 	usb_idVendor="${deviceinfo_usb_idVendor:-0x18D1}"   # default: Google Inc.
-	usb_idProduct="${deviceinfo_usb_idProduct:-0xD001}" # default: Nexus 4 (fastboot)
+	# Since after introduce usb composite device and os_desc, google adb driver
+	# still pop up. So modify it with an unused value so generic driver is selected
+	# such that composite driver + ncm happened.
+	usb_idProduct="${deviceinfo_usb_idProduct:-0xD00D}" # default: Nexus 4 (fastboot)
 	usb_serialnumber="${deviceinfo_usb_serialnumber:-postmarketOS}"
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
