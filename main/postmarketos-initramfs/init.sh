@@ -104,7 +104,7 @@ else
 	# for example, create a tmpfs mount and put all busybox and other tools
 	# over there and do switch_root like Android "init --second_stage" does.
 	pivot_root . /root
-	exec chroot . "$(init)"
+	exec chroot . $init
 fi
 
 echo "ERROR: switch_root failed!"
