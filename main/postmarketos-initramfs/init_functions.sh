@@ -679,6 +679,23 @@ setup_usb_network_configfs() {
 	echo "USB network" > $CONFIGFS/g1/configs/c.1/strings/0x409/configuration \
 		|| echo "  Couldn't write configration name"
 
+	echo 120 > $CONFIGFS/g1/configs/c.1/MaxPower \
+        	 || echo "  Couldn't write MaxPower"
+
+	echo 1 > $CONFIGFS/g1/os_desc/use \
+        	|| echo "  Couldn't write $CONFIGFS/g1/configs/c.1/os_desc/use"
+
+	echo "0xcd" > $CONFIGFS/g1/os_desc/b_vendor_code \
+        	|| echo "  Couldn't write $CONFIGFS/g1/configs/c.1/os_desc/b_vendor_code"
+
+	echo "MSFT100" > $CONFIGFS/g1/os_desc/qw_sign \
+        	|| echo "  Couldn't write $CONFIGFS/g1/os_desc/qw_sign"
+
+	# Link the os_desc instance to the configuration
+	# This trick can workaround missing kernel functionfs driver bind()/unbind()
+	ln -sf $(realpath "$CONFIGFS/g1/configs/c.1") $CONFIGFS/g1/os_desc/ \
+	        || echo "  Couldn't symlink os_desc"
+
 	# Link the network instance to the configuration
 	ln -s $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't symlink $usb_network_function"
