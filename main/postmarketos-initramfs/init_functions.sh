@@ -6,6 +6,7 @@ PMOS_BOOT=""
 PMOS_ROOT=""
 # Use new mount location from /config to /sys/kernel/config
 CONFIGFS_DIR="/sys/kernel/config"
+USB_FFS="/dev/usb-ffs"
 
 # Redirect stdout and stderr to logfile
 setup_log() {
@@ -633,6 +634,7 @@ setup_usb_network_configfs() {
 	usb_serialnumber="${deviceinfo_usb_serialnumber:-postmarketOS}"
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
+	usb_ffs_function="ffs.adb"
 
 	echo "  Setting up an USB gadget through configfs"
 	# Create an usb gadet configuration
@@ -674,6 +676,11 @@ setup_usb_network_configfs() {
 		fi
 	fi
 
+	# Create ffs adb function.
+	if ! mkdir $CONFIGFS/g1/functions/"$usb_ffs_function"; then
+		echo "  Couldn't create $CONFIGFS/g1/functions/$usb_ffs_function"
+	fi
+
 	# Create configuration instance for the gadget
 	mkdir $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't create $CONFIGFS/g1/configs/c.1"
@@ -703,6 +710,23 @@ setup_usb_network_configfs() {
         # This trick can workaround missing kernel functionfs driver bind()/unbind()
 	ln -sf $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't symlink $usb_network_function"
+
+	# Support adbd functions only adbd binary exists otherwise enable UDC fail.
+	if [ -e "/bin/adbd"] || [ -e "/sbin/adbd" ]; then
+		ln -sf $(realpath "$CONFIGFS/g1/functions/$usb_ffs_function") \
+			"$CONFIGFS/g1/configs/c.1/f_$usb_ffs_function" \
+		        || echo "  Couldn't symlink $usb_ffs_function"
+
+		# Specially for ADB, cant move early. should be right here.
+		mkdir -p $USB_FFS \
+		        || echo "  Couldn't create $USB_FFS"
+
+		mkdir -p $USB_FFS/adb \
+			|| echo "  Couldn't create $USB_FFS/adb"
+
+		mount -o uid=2000,gid=2000 -t functionfs adb $USB_FFS/adb
+		exec /bin/adbd --device_banner=device &
+	fi
 
 	# If an argument was supplied then skip writing to the UDC (only used for mass storage
 	# log recovery)
