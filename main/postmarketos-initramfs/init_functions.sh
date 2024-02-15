@@ -13,6 +13,7 @@ setup_log() {
 	local log_to_console=""
 
 	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/cmdline && log_to_console="true"
+	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/bootconfig && log_to_console="true"
 	grep -q PMOS_CONTAINERIZED_ENABLE /proc/cmdline && PMOS_CONTAINERIZED_ENABLE="true"
 	grep -q PMOS_CONTAINERIZED_ENABLE /proc/bootconfig && PMOS_CONTAINERIZED_ENABLE="true"
 
@@ -39,10 +40,20 @@ setup_log() {
 }
 
 mount_proc_sys_dev() {
+	# Bindly create those dir in case not available
+	mkdir -p /proc
+	mkdir -p /tmp
+	mkdir -p /sys
+	mkdir -p /dev
+	mkdir -p /run
+
 	# mdev
 	mount -t proc -o nodev,noexec,nosuid proc /proc || echo "Couldn't mount /proc"
 	mount -t sysfs -o nodev,noexec,nosuid sysfs /sys || echo "Couldn't mount /sys"
-	mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
+	# Now deploy as tmpfs for containerized, since devtmpfs is the last fs not
+	# supporting kernel NAMESPACE, so make it do as Android ramdisk, replace devtmpfs
+	# by tmpfs and let the unique devtmpfs mount under postmarketOS sysroot
+	mount -t tmpfs -o mode=0755,nosuid none /dev || echo "Couldn't mount /dev"
 	mount -t tmpfs -o nosuid,nodev,mode=0755 run /run || echo "Couldn't mount /run"
 
 	mkdir -p $CONFIGFS_DIR
@@ -54,6 +65,36 @@ mount_proc_sys_dev() {
 	# /dev/pts (needed for telnet)
 	mkdir -p /dev/pts
 	mount -t devpts devpts /dev/pts
+
+	# Manually create /dev node since devtmpfs created for us but tmpfs won't
+	#mknod /dev/tty c 5 0
+	#mknod /dev/tty0 c 4 0
+	#mknod /dev/tty1 c 1 0
+	#mknod /dev/console c 5 1
+	mknod /dev/kmsg c 1 11
+	mknod /dev/null c 1 3
+	# TODO: there might cases not having this node due to absent of kernel DRM
+	# driver support, but in containerized ramdisk, it doesn't matter much.
+	# and one more important issue is later init script will wait 10s for it
+	# so manually make it and bypass the search is a good idea.
+	#
+	# Possible workaround is mount devtmpfs into, aka /dev_real, and symlink
+	# against it, finally remove the symlink before world switch prevent abuse.
+	mknod /dev/fb0 c 29 0
+
+	# copy from Android/LOS ramdisk
+	ln -sf /proc/self/fd/0 /dev/stdin
+	ln -sf /proc/self/fd/1 /dev/stdout
+	ln -sf /proc/self/fd/2 /dev/stderr
+
+	ln -sf /proc/self/fd/1 /dev/console
+	ln -sf /proc/self/fd/1 /dev/tty
+
+	mkdir -p /tmp
+	mount -t tmpfs tmpfs /tmp
+
+	mkdir /mnt
+	mount -t tmpfs tmpfs /mnt
 }
 
 setup_firmware_path() {
