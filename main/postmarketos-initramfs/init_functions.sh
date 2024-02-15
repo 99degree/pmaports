@@ -4,6 +4,7 @@ ROOT_PARTITION_UNLOCKED=0
 ROOT_PARTITION_RESIZED=0
 PMOS_BOOT=""
 PMOS_ROOT=""
+CONFIGFS_DIR="/config"
 
 # Redirect stdout and stderr to logfile
 setup_log() {
@@ -40,8 +41,8 @@ mount_proc_sys_dev() {
 	mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
 	mount -t tmpfs -o nosuid,nodev,mode=0755 run /run || echo "Couldn't mount /run"
 
-	mkdir /config
-	mount -t configfs -o nodev,noexec,nosuid configfs /config
+	mkdir $CONFIGFS_DIR
+	mount -t configfs -o nodev,noexec,nosuid configfs $CONFIGFS_DIR
 
 	# /dev/pts (needed for telnet)
 	mkdir -p /dev/pts
@@ -599,20 +600,20 @@ setup_usb_configfs_udc() {
 	fi
 
 	# Remove any existing UDC to avoid "write error: Resource busy" when setting UDC again
-	echo "" > /config/usb_gadget/g1/UDC || echo "  Couldn't write to clear UDC"
+	echo "" > $CONFIGFS_DIR/usb_gadget/g1/UDC || echo "  Couldn't write to clear UDC"
 	# Link the gadget instance to an USB Device Controller. This activates the gadget.
 	# See also: https://gitlab.com/postmarketOS/pmbootstrap/issues/338
-	echo "$_udc_dev" > /config/usb_gadget/g1/UDC || echo "  Couldn't write new UDC"
+	echo "$_udc_dev" > $CONFIGFS_DIR/usb_gadget/g1/UDC || echo "  Couldn't write new UDC"
 }
 
 # $1: if set, skip writing to the UDC
 setup_usb_network_configfs() {
 	# See: https://www.kernel.org/doc/Documentation/usb/gadget_configfs.txt
-	CONFIGFS=/config/usb_gadget
+	CONFIGFS=$CONFIGFS_DIR/usb_gadget
 	local skip_udc="$1"
 
 	if ! [ -e "$CONFIGFS" ]; then
-		echo "  /config/usb_gadget does not exist, skipping configfs usb gadget"
+		echo "  $CONFIGFS_DIR/usb_gadget does not exist, skipping configfs usb gadget"
 		return
 	fi
 
@@ -698,8 +699,8 @@ start_unudhcpd() {
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
 	INTERFACE="$(
-		cat "/config/usb_gadget/g1/functions/$usb_network_function/ifname" 2>/dev/null ||
-		cat "/config/usb_gadget/g1/functions/$usb_network_function_fallback/ifname" 2>/dev/null ||
+		cat "$CONFIGFS_DIR/usb_gadget/g1/functions/$usb_network_function/ifname" 2>/dev/null ||
+		cat "$CONFIGFS_DIR/usb_gadget/g1/functions/$usb_network_function_fallback/ifname" 2>/dev/null ||
 		echo ''
 	)"
 	if [ -n "$INTERFACE" ]; then
@@ -870,7 +871,7 @@ create_logs_disk() {
 export_logs() {
 	local loop_dev=""
 	usb_mass_storage_function="mass_storage.0"
-	active_udc="$(cat /config/usb_gadget/g1/UDC)"
+	active_udc="$(cat $CONFIGFS_DIR/usb_gadget/g1/UDC)"
 
 	loop_dev="$(losetup -f)"
 
@@ -883,7 +884,7 @@ export_logs() {
 		setup_usb_network_configfs "skip_udc"
 	else
 		# Unset UDC
-		echo "" > /config/usb_gadget/g1/UDC
+		echo "" > $CONFIGFS_DIR/usb_gadget/g1/UDC
 	fi
 
 	mkdir "$CONFIGFS"/g1/functions/"$usb_mass_storage_function" || return
