@@ -589,7 +589,9 @@ setup_usb_configfs_udc() {
 	# Check if there's an USB Device Controller
 	local _udc_dev="${deviceinfo_usb_network_udc:-}"
 	if [ -z "$_udc_dev" ]; then
-		_udc_dev=$(ls /sys/class/udc)
+		# This new grep is to workaround some setup with 2 UDC
+		# and one is namely "dummy_udc.0"
+		_udc_dev=$(ls /sys/class/udc | grep usb)
 		if [ -z "$_udc_dev" ]; then
 			echo "  No USB Device Controller available"
 			return
