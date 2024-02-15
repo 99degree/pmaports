@@ -630,6 +630,20 @@ setup_usb_network_configfs() {
 	echo "$usb_idVendor"  > "$CONFIGFS/g1/idVendor"
 	echo "$usb_idProduct" > "$CONFIGFS/g1/idProduct"
 
+	# Make it a composite class device
+	# from https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/supported-usb-classes
+	# {4d36e972-e325-11ce-bfc1-08002be10318}
+	# Supports SubClass 04h and Protocol 01h
+	#
+	# Actual test bDeviceSubClass by 0x04 shows no more composite device but ncm only
+	# but 0x2 can have 2 drivers: composite + ncm. So composite + ncm + adb + rndis possibly.
+	# So fill bDeviceSubClass by 0x2 is best fit.
+	echo 0x0100 > "$CONFIGFS/g1/bcdDevice"
+	echo 0x0200 > "$CONFIGFS/g1/bcdUSB"
+	echo 0xEF > "$CONFIGFS/g1/bDeviceClass"
+	echo 0x02 > "$CONFIGFS/g1/bDeviceSubClass"
+	echo 0x01 > "$CONFIGFS/g1/bDeviceProtocol"
+
 	# Create english (0x409) strings
 	mkdir $CONFIGFS/g1/strings/0x409 || echo "  Couldn't create $CONFIGFS/g1/strings/0x409"
 
