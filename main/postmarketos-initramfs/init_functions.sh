@@ -70,7 +70,10 @@ load_modules() {
 	local modules="$2"
 	[ -f "$file" ] && modules="$modules $(grep -v ^\# "$file")"
 	# shellcheck disable=SC2086
-	modprobe -a $modules
+	if [ -f "$file" ] && modules="$modules $(grep -v ^\# "$file")"; then
+		# shellcheck disable=SC2086
+		modprobe -a $modules
+	fi
 }
 
 setup_mdev() {
