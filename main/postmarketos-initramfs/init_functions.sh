@@ -4,7 +4,8 @@ ROOT_PARTITION_UNLOCKED=0
 ROOT_PARTITION_RESIZED=0
 PMOS_BOOT=""
 PMOS_ROOT=""
-CONFIGFS_DIR="/config"
+# Use new mount location from /config to /sys/kernel/config
+CONFIGFS_DIR="/sys/kernel/config"
 
 # Redirect stdout and stderr to logfile
 setup_log() {
@@ -41,7 +42,7 @@ mount_proc_sys_dev() {
 	mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
 	mount -t tmpfs -o nosuid,nodev,mode=0755 run /run || echo "Couldn't mount /run"
 
-	mkdir $CONFIGFS_DIR
+	mkdir -p $CONFIGFS_DIR
 	mount -t configfs -o nodev,noexec,nosuid configfs $CONFIGFS_DIR
 
 	# Mount pstore aas well so we can get kmsg from last fail boot over there
