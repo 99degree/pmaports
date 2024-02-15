@@ -4,7 +4,7 @@
 pkgname=device-xiaomi-miatoll
 pkgdesc="Xiaomi Miatoll"
 pkgver=1
-pkgrel=8
+pkgrel=9
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -21,6 +21,7 @@ depends="
 	soc-qcom-sm7150-unl0kr-msmdrmfb-quirk
 	linux-postmarketos-qcom-sm7150
 	nano
+	kexec-tools
 "
 makedepends="devicepkg-dev"
 source="
