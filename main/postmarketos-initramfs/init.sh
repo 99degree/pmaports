@@ -2,6 +2,7 @@
 # shellcheck disable=SC1091
 
 IN_CI="false"
+PMOS_CONTAINERIZED_ENABLE="false"
 
 [ -e /hooks/10-verbose-initfs.sh ] && set -x
 
@@ -89,7 +90,16 @@ setup_bootchart2
 killall telnetd mdev udevd msm-fb-refresher 2>/dev/null
 
 # shellcheck disable=SC2093
-exec switch_root /sysroot "$init"
+if [ "$PMOS_CONTAINERIZED_ENABLE" = "false" ]; then
+	exec switch_root /sysroot "$(init)"
+else
+	cd /sysroot
+	# TODO: Actually /root is not exist in /sysroot/ so new NS can
+	# not access old / unless new pmbootstrap create it.
+	# "/oldroot" is more resonable.
+	pivot_root . /root
+	exec chroot . "$(init)"
+fi
 
 echo "ERROR: switch_root failed!"
 echo "Looping forever. Install and use the debug-shell hook to debug this."

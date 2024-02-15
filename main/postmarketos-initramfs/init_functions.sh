@@ -13,6 +13,8 @@ setup_log() {
 	local log_to_console=""
 
 	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/cmdline && log_to_console="true"
+	grep -q PMOS_CONTAINERIZED_ENABLE /proc/cmdline && PMOS_CONTAINERIZED_ENABLE="true"
+	grep -q PMOS_CONTAINERIZED_ENABLE /proc/bootconfig && PMOS_CONTAINERIZED_ENABLE="true"
 
 	echo "### postmarketOS initramfs ###"
 
