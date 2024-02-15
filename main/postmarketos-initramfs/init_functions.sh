@@ -697,7 +697,8 @@ setup_usb_network_configfs() {
 	        || echo "  Couldn't symlink os_desc"
 
 	# Link the network instance to the configuration
-	ln -s $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
+        # This trick can workaround missing kernel functionfs driver bind()/unbind()
+	ln -sf $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't symlink $usb_network_function"
 
 	# If an argument was supplied then skip writing to the UDC (only used for mass storage
