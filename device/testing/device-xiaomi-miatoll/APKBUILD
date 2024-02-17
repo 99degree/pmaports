@@ -4,24 +4,25 @@
 pkgname=device-xiaomi-miatoll
 pkgdesc="Xiaomi Miatoll"
 pkgver=1
-pkgrel=9
+pkgrel=10
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
 options="!check !archcheck"
 depends="
+	adbd-linux
+	firmware-xiaomi-miatoll
+	kexec-tools
+	linux-postmarketos-qcom-sm7150
+	nano
 	make-dynpart-mappings
 	mesa-vulkan-freedreno
 	mkbootimg
 	postmarketos-base
 	postmarketos-update-kernel
-	firmware-xiaomi-miatoll
 	soc-qcom-sm7150
 	soc-qcom-sm7150-spmi-vibrator-feedbackd-rules
 	soc-qcom-sm7150-unl0kr-msmdrmfb-quirk
-	linux-postmarketos-qcom-sm7150
-	nano
-	kexec-tools
 "
 makedepends="devicepkg-dev"
 source="
