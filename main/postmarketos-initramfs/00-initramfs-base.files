@@ -1,6 +1,7 @@
 /bin/busybox
 /bin/busybox-extras
 /bin/sh
+/usr/sbin/adbd:/bin/adbd
 /etc/deviceinfo
 /etc/unudhcpd.conf
 /lib/mdev/persistent-storage
