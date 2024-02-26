@@ -768,7 +768,12 @@ setup_usb_network_configfs() {
 			|| echo "  Couldn't create $USB_FFS/adb"
 
 		mount -o uid=2000,gid=2000 -t functionfs adb $USB_FFS/adb
-		exec /bin/adbd --device_banner=device &
+		exec adbd --device_banner=device &
+
+		if [ -z "$(pidof adbd)" ]; then
+			umount $USB_FFS/adb
+			rm "$CONFIGFS/g1/configs/c.1/f_$usb_ffs_function"
+		fi
 	fi
 
 	# If an argument was supplied then skip writing to the UDC (only used for mass storage
