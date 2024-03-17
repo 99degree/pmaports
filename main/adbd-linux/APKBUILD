@@ -1,0 +1,33 @@
+# Maintainer: 99degree https://github.com/99degree <a@b.com>
+pkgname=adbd-linux
+pkgver=1.0.2
+pkgrel=3
+pkgdesc="Android bootimg tools (maintained fork of the C version, see #441)"
+url="https://github.com/99degree/adbd-linux"
+arch="aarch64"
+license="Apache-2.0"
+provides="module=$pkgver-r$pkgrel"
+replaces="module"
+source="adbd-linux-$pkgver.tar.gz::https://github.com/99degree/adbd-linux/archive/refs/tags/$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+license="MIT"
+makedepends="build-base libcap-dev bsd-compat-headers"
+
+build() {
+	echo $(ls)
+	cd "$builddir"
+	RANLIB=ranlib make
+}
+
+package() {
+	install -D -m755 "$builddir"/adb/adbd \
+		"$pkgdir"/usr/bin/adbd
+
+        install -D -m755 "$builddir"/adb.sh \
+                "$pkgdir"/usr/bin/adb.sh
+}
+
+sha512sums="
+5feb2dd62a45f66598da9606420ad28c92ddc43a1c77b788f1691504dce3d2e0c21612a9da301d470c10f73cc739589c72453a750e57bbfa6e86f06a8dee3fc1  adbd-linux-1.0.2.tar.gz
+"

@@ -1,0 +1,116 @@
+pkgname=firmware-xiaomi-miatoll
+pkgver=1
+pkgrel=0
+pkgdesc="Firmware for Xiaomi Miatoll"
+subpackages="
+	$pkgname-adsp:adsp
+	$pkgname-cdsp:cdsp
+	$pkgname-ipa:ipa
+	$pkgname-modem:modem
+	$pkgname-venus:venus
+	$pkgname-wlan:wlan
+	$pkgname-gpu:gpu
+	$pkgname-misc:misc
+	"
+url="https://github.com/99degree/firmware-xiaomi-miatoll"
+arch="aarch64"
+license="proprietary"
+options="!check !strip !archcheck !tracedeps pmb:cross-native"
+_commit="32fa45589a263f131baa8e63b191320d44a6505f"
+source="$pkgname-$_commit.tar.gz::$url/archive/$_commit/$pkgname-$_commit.tar.gz"
+builddir="$srcdir/$pkgname-$_commit"
+
+package() {
+	# parent package is empty
+	mkdir -p "$pkgdir"
+}
+
+adsp() {
+	pkgdesc="Xiaomi Miatoll adsp firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/adsp* -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+cdsp() {
+	pkgdesc="Xiaomi Miatoll cdsp firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/cdsp* -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+ipa() {
+	pkgdesc="Xiaomi Miatoll ipa firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/ipa_fws.* -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+modem() {
+	pkgdesc="Xiaomi Miatoll modem firmware"
+
+	# cp because of the modem_pr directory
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+	cp -r "$builddir"/modem* \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+	find "$subpkgdir/lib/firmware/qcom/sm7125/miatoll" \
+		-type f -exec chmod 0644 {} \;
+}
+
+venus() {
+	pkgdesc="Xiaomi Miatoll venus firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/venus.mbn -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+wlan() {
+	pkgdesc="Xiaomi Miatoll wlan firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/wlanmdsp.mbn -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+gpu() {
+	pkgdesc="Xiaomi Miatoll gpu firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/a615_zap.mbn -t \
+		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+}
+
+misc() {
+	pkgdesc="Xiaomi Miatoll misc firmware"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+
+	install -Dm644 "$builddir"/Drv2624Date.ini -t \
+		"$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir"/aw8624* -t \
+		"$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir"/drv2624* -t \
+		"$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir"/novatek_ts_* -t \
+		"$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir"/osc_rtp_24K_5s.bin -t \
+		"$subpkgdir/lib/firmware/"
+}
+
+sha512sums="
+b2af48f28d3f2ccc7c55938804e82b2393b4d9be0c3f8d832b55093d1241986fc7be0a5844dcf5ff85ceb6d439d62b4ac153ca3a549dc25a24c17ddb1365dd2d  firmware-xiaomi-miatoll-32fa45589a263f131baa8e63b191320d44a6505f.tar.gz
+"

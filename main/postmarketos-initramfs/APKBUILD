@@ -1,12 +1,14 @@
-# Maintainer: Oliver Smith <ollieparanoid@postmarketos.org>
-# Co-Maintainer: Clayton Craft <clayton@craftyguy.net>
+# Maintainer: 99degree "https://github.com/99degree" <a@b.com>
+# Reference: <https://postmarketos.org/devicepkg>
 pkgname=postmarketos-initramfs
 pkgver=2.5.4
 pkgrel=0
+pkgrel=9999
 pkgdesc="Base files for the postmarketOS initramfs / initramfs-extra"
 url="https://postmarketos.org"
 options="!check"  # no tests
 depends="
+	adbd-linux
 	blkid
 	btrfs-progs
 	busybox-extras
@@ -17,6 +19,7 @@ depends="
 	e2fsprogs
 	e2fsprogs-extra
 	f2fs-tools
+	kexec-tools
 	lz4
 	mdev-conf
 	multipath-tools
@@ -86,7 +89,7 @@ package() {
 sha512sums="
 0f8e57dd6e5169ffc3579d85ee64447d0f89b727db05bd72d31457fd40268aad672ce650b860c3a9e25be4b0705d49101e1df7346b08bd477b6b285710a4b7d1  00-default.modules
 5b364300f31c91fd0591eb0715f67cbf5383f45246a5fb9f34b79f7cb2e3b15768b2130e5f32f816cc169950f988c1beabc879ba31645c58ce131a288dbc071d  00-initramfs-base.dirs
-ab41b45b0613f25a61114ed8c8b92bc53c60838f6e2e0ba18c76e5369b2984e6023a0661887692673aca3f647f268c468a468f6b1ac424cfee609017a89481dd  00-initramfs-base.files
+f582689547fea482523949e1e06fc3511ca8d6a0dc23cca9cb3bc8b010c60d96818f2e3b712e77063c5cc4dbb9993c4638c280d3d55784586a94f1109a83ed06  00-initramfs-base.files
 8a4adad3785af474b36a09a05f6a3b2c4b4f43aac331a53b903abfa51ea12be1e3d1d807b7a6e66a1346815f3b0044daf8cd62e21e2dc75d2db13ee265a72985  00-initramfs-extra-base.files
 b1462989633c65a102e7ae7ced9c41a00673b4c7434cd3fe16c229c39bb870d7e850b0d317487191b7d7ca32c75b2eed1561b1facf405bd4d876d32c71badcf3  init.sh
 8ff684e8245217cc9461297bce55dd8b417f0478ef38cdbddf7662f9ecc4324ca09e75978261084e00f5a1f2e36cc3b25a609a9bdca4addc5a60d3c370cbdb90  init_functions.sh

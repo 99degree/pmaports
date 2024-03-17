@@ -4,12 +4,18 @@ ROOT_PARTITION_UNLOCKED=0
 ROOT_PARTITION_RESIZED=0
 PMOS_BOOT=""
 PMOS_ROOT=""
+# Use new mount location from /config to /sys/kernel/config
+CONFIGFS_DIR="/sys/kernel/config"
+USB_FFS="/dev/usb-ffs"
 
 # Redirect stdout and stderr to logfile
 setup_log() {
 	local log_to_console=""
 
 	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/cmdline && log_to_console="true"
+	grep -q PMOS_NO_OUTPUT_REDIRECT /proc/bootconfig && log_to_console="true"
+	grep -q PMOS_CONTAINERIZED_ENABLE /proc/cmdline && PMOS_CONTAINERIZED_ENABLE="true"
+	grep -q PMOS_CONTAINERIZED_ENABLE /proc/bootconfig && PMOS_CONTAINERIZED_ENABLE="true"
 
 	echo "### postmarketOS initramfs ###"
 
@@ -34,18 +40,61 @@ setup_log() {
 }
 
 mount_proc_sys_dev() {
+	# Bindly create those dir in case not available
+	mkdir -p /proc
+	mkdir -p /tmp
+	mkdir -p /sys
+	mkdir -p /dev
+	mkdir -p /run
+
 	# mdev
 	mount -t proc -o nodev,noexec,nosuid proc /proc || echo "Couldn't mount /proc"
 	mount -t sysfs -o nodev,noexec,nosuid sysfs /sys || echo "Couldn't mount /sys"
-	mount -t devtmpfs -o mode=0755,nosuid dev /dev || echo "Couldn't mount /dev"
+	# Now deploy as tmpfs for containerized, since devtmpfs is the last fs not
+	# supporting kernel NAMESPACE, so make it do as Android ramdisk, replace devtmpfs
+	# by tmpfs and let the unique devtmpfs mount under postmarketOS sysroot
+	mount -t tmpfs -o mode=0755,nosuid none /dev || echo "Couldn't mount /dev"
 	mount -t tmpfs -o nosuid,nodev,mode=0755 run /run || echo "Couldn't mount /run"
 
-	mkdir /config
-	mount -t configfs -o nodev,noexec,nosuid configfs /config
+	mkdir -p $CONFIGFS_DIR
+	mount -t configfs -o nodev,noexec,nosuid configfs $CONFIGFS_DIR
+
+	# Mount pstore aas well so we can get kmsg from last fail boot over there
+	mount -t pstore pstore /sys/fs/pstore
 
 	# /dev/pts (needed for telnet)
 	mkdir -p /dev/pts
 	mount -t devpts devpts /dev/pts
+
+	# Manually create /dev node since devtmpfs created for us but tmpfs won't
+	#mknod /dev/tty c 5 0
+	#mknod /dev/tty0 c 4 0
+	#mknod /dev/tty1 c 1 0
+	#mknod /dev/console c 5 1
+	mknod /dev/kmsg c 1 11
+	mknod /dev/null c 1 3
+	# TODO: there might cases not having this node due to absent of kernel DRM
+	# driver support, but in containerized ramdisk, it doesn't matter much.
+	# and one more important issue is later init script will wait 10s for it
+	# so manually make it and bypass the search is a good idea.
+	#
+	# Possible workaround is mount devtmpfs into, aka /dev_real, and symlink
+	# against it, finally remove the symlink before world switch prevent abuse.
+	mknod /dev/fb0 c 29 0
+
+	# copy from Android/LOS ramdisk
+	ln -sf /proc/self/fd/0 /dev/stdin
+	ln -sf /proc/self/fd/1 /dev/stdout
+	ln -sf /proc/self/fd/2 /dev/stderr
+
+	ln -sf /proc/self/fd/1 /dev/console
+	ln -sf /proc/self/fd/1 /dev/tty
+
+	mkdir -p /tmp
+	mount -t tmpfs tmpfs /tmp
+
+	mkdir /mnt
+	mount -t tmpfs tmpfs /mnt
 }
 
 setup_firmware_path() {
@@ -69,7 +118,10 @@ load_modules() {
 	local modules="$2"
 	[ -f "$file" ] && modules="$modules $(grep -v ^\# "$file")"
 	# shellcheck disable=SC2086
-	modprobe -a $modules
+	if [ -f "$file" ] && modules="$modules $(grep -v ^\# "$file")"; then
+		# shellcheck disable=SC2086
+		modprobe -a $modules
+	fi
 }
 
 setup_mdev() {
@@ -589,7 +641,9 @@ setup_usb_configfs_udc() {
 	# Check if there's an USB Device Controller
 	local _udc_dev="${deviceinfo_usb_network_udc:-}"
 	if [ -z "$_udc_dev" ]; then
-		_udc_dev=$(ls /sys/class/udc)
+		# This new grep is to workaround some setup with 2 UDC
+		# and one is namely "dummy_udc.0"
+		_udc_dev=$(ls /sys/class/udc | grep usb)
 		if [ -z "$_udc_dev" ]; then
 			echo "  No USB Device Controller available"
 			return
@@ -597,35 +651,53 @@ setup_usb_configfs_udc() {
 	fi
 
 	# Remove any existing UDC to avoid "write error: Resource busy" when setting UDC again
-	echo "" > /config/usb_gadget/g1/UDC || echo "  Couldn't write to clear UDC"
+	echo "" > $CONFIGFS_DIR/usb_gadget/g1/UDC || echo "  Couldn't write to clear UDC"
 	# Link the gadget instance to an USB Device Controller. This activates the gadget.
 	# See also: https://gitlab.com/postmarketOS/pmbootstrap/issues/338
-	echo "$_udc_dev" > /config/usb_gadget/g1/UDC || echo "  Couldn't write new UDC"
+	echo "$_udc_dev" > $CONFIGFS_DIR/usb_gadget/g1/UDC || echo "  Couldn't write new UDC"
 }
 
 # $1: if set, skip writing to the UDC
 setup_usb_network_configfs() {
 	# See: https://www.kernel.org/doc/Documentation/usb/gadget_configfs.txt
-	CONFIGFS=/config/usb_gadget
+	CONFIGFS=$CONFIGFS_DIR/usb_gadget
 	local skip_udc="$1"
 
 	if ! [ -e "$CONFIGFS" ]; then
-		echo "  /config/usb_gadget does not exist, skipping configfs usb gadget"
+		echo "  $CONFIGFS_DIR/usb_gadget does not exist, skipping configfs usb gadget"
 		return
 	fi
 
 	# Default values for USB-related deviceinfo variables
 	usb_idVendor="${deviceinfo_usb_idVendor:-0x18D1}"   # default: Google Inc.
-	usb_idProduct="${deviceinfo_usb_idProduct:-0xD001}" # default: Nexus 4 (fastboot)
+	# Since after introduce usb composite device and os_desc, google adb driver
+	# still pop up. So modify it with an unused value so generic driver is selected
+	# such that composite driver + ncm happened.
+	usb_idProduct="${deviceinfo_usb_idProduct:-0xD00D}" # default: Nexus 4 (fastboot)
 	usb_serialnumber="${deviceinfo_usb_serialnumber:-postmarketOS}"
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
+	usb_ffs_function="ffs.adb"
 
 	echo "  Setting up an USB gadget through configfs"
 	# Create an usb gadet configuration
 	mkdir $CONFIGFS/g1 || echo "  Couldn't create $CONFIGFS/g1"
 	echo "$usb_idVendor"  > "$CONFIGFS/g1/idVendor"
 	echo "$usb_idProduct" > "$CONFIGFS/g1/idProduct"
+
+	# Make it a composite class device
+	# from https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/supported-usb-classes
+	# {4d36e972-e325-11ce-bfc1-08002be10318}
+	# Supports SubClass 04h and Protocol 01h
+	#
+	# Actual test bDeviceSubClass by 0x04 shows no more composite device but ncm only
+	# but 0x2 can have 2 drivers: composite + ncm. So composite + ncm + adb + rndis possibly.
+	# So fill bDeviceSubClass by 0x2 is best fit.
+	echo 0x0100 > "$CONFIGFS/g1/bcdDevice"
+	echo 0x0200 > "$CONFIGFS/g1/bcdUSB"
+	echo 0xEF > "$CONFIGFS/g1/bDeviceClass"
+	echo 0x02 > "$CONFIGFS/g1/bDeviceSubClass"
+	echo 0x01 > "$CONFIGFS/g1/bDeviceProtocol"
 
 	# Create english (0x409) strings
 	mkdir $CONFIGFS/g1/strings/0x409 || echo "  Couldn't create $CONFIGFS/g1/strings/0x409"
@@ -647,6 +719,11 @@ setup_usb_network_configfs() {
 		fi
 	fi
 
+	# Create ffs adb function.
+	if ! mkdir $CONFIGFS/g1/functions/"$usb_ffs_function"; then
+		echo "  Couldn't create $CONFIGFS/g1/functions/$usb_ffs_function"
+	fi
+
 	# Create configuration instance for the gadget
 	mkdir $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't create $CONFIGFS/g1/configs/c.1"
@@ -655,9 +732,49 @@ setup_usb_network_configfs() {
 	echo "USB network" > $CONFIGFS/g1/configs/c.1/strings/0x409/configuration \
 		|| echo "  Couldn't write configration name"
 
+	echo 120 > $CONFIGFS/g1/configs/c.1/MaxPower \
+        	 || echo "  Couldn't write MaxPower"
+
+	echo 1 > $CONFIGFS/g1/os_desc/use \
+        	|| echo "  Couldn't write $CONFIGFS/g1/configs/c.1/os_desc/use"
+
+	echo "0xcd" > $CONFIGFS/g1/os_desc/b_vendor_code \
+        	|| echo "  Couldn't write $CONFIGFS/g1/configs/c.1/os_desc/b_vendor_code"
+
+	echo "MSFT100" > $CONFIGFS/g1/os_desc/qw_sign \
+        	|| echo "  Couldn't write $CONFIGFS/g1/os_desc/qw_sign"
+
+	# Link the os_desc instance to the configuration
+	# This trick can workaround missing kernel functionfs driver bind()/unbind()
+	ln -sf $(realpath "$CONFIGFS/g1/configs/c.1") $CONFIGFS/g1/os_desc/ \
+	        || echo "  Couldn't symlink os_desc"
+
 	# Link the network instance to the configuration
-	ln -s $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
+        # This trick can workaround missing kernel functionfs driver bind()/unbind()
+	ln -sf $CONFIGFS/g1/functions/"$usb_network_function" $CONFIGFS/g1/configs/c.1 \
 		|| echo "  Couldn't symlink $usb_network_function"
+
+	# Support adbd functions only adbd binary exists otherwise enable UDC fail.
+	if [ -e "/bin/adbd"] || [ -e "/sbin/adbd" ]; then
+		ln -sf $(realpath "$CONFIGFS/g1/functions/$usb_ffs_function") \
+			"$CONFIGFS/g1/configs/c.1/f_$usb_ffs_function" \
+		        || echo "  Couldn't symlink $usb_ffs_function"
+
+		# Specially for ADB, cant move early. should be right here.
+		mkdir -p $USB_FFS \
+		        || echo "  Couldn't create $USB_FFS"
+
+		mkdir -p $USB_FFS/adb \
+			|| echo "  Couldn't create $USB_FFS/adb"
+
+		mount -o uid=2000,gid=2000 -t functionfs adb $USB_FFS/adb
+		exec adbd --device_banner=device &
+
+		if [ -z "$(pidof adbd)" ]; then
+			umount $USB_FFS/adb
+			rm "$CONFIGFS/g1/configs/c.1/f_$usb_ffs_function"
+		fi
+	fi
 
 	# If an argument was supplied then skip writing to the UDC (only used for mass storage
 	# log recovery)
@@ -695,6 +812,7 @@ start_unudhcpd() {
 	# Get usb interface
 	usb_network_function="${deviceinfo_usb_network_function:-ncm.usb0}"
 	usb_network_function_fallback="rndis.usb0"
+	INTERFACE=""
 	if [ -n "$(cat /config/usb_gadget/g1/UDC)" ]; then
 		INTERFACE="$(
 			cat "/config/usb_gadget/g1/functions/$usb_network_function/ifname" 2>/dev/null ||
@@ -872,7 +990,7 @@ create_logs_disk() {
 export_logs() {
 	local loop_dev=""
 	usb_mass_storage_function="mass_storage.0"
-	active_udc="$(cat /config/usb_gadget/g1/UDC)"
+	active_udc="$(cat $CONFIGFS_DIR/usb_gadget/g1/UDC)"
 
 	loop_dev="$(losetup -f)"
 
@@ -885,7 +1003,7 @@ export_logs() {
 		setup_usb_network_configfs "skip_udc"
 	else
 		# Unset UDC
-		echo "" > /config/usb_gadget/g1/UDC
+		echo "" > $CONFIGFS_DIR/usb_gadget/g1/UDC
 	fi
 
 	mkdir "$CONFIGFS"/g1/functions/"$usb_mass_storage_function" || return
