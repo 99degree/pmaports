@@ -1,6 +1,6 @@
 pkgname=firmware-xiaomi-miatoll
 pkgver=1
-pkgrel=0
+pkgrel=2
 pkgdesc="Firmware for Xiaomi Miatoll"
 subpackages="
 	$pkgname-adsp:adsp
@@ -15,14 +15,17 @@ subpackages="
 url="https://github.com/99degree/firmware-xiaomi-miatoll"
 arch="aarch64"
 license="proprietary"
-options="!check !strip !archcheck !tracedeps pmb:cross-native"
-_commit="32fa45589a263f131baa8e63b191320d44a6505f"
+options="!check !strip !archcheck !tracedeps"
+_commit="0f7786f77c794b2bfef3de094135acafbaaef388"
 source="$pkgname-$_commit.tar.gz::$url/archive/$_commit/$pkgname-$_commit.tar.gz"
 builddir="$srcdir/$pkgname-$_commit"
 
 package() {
 	# parent package is empty
 	mkdir -p "$pkgdir"
+
+	mkdir -p "$subpkgdir/lib/firmware/qcom"
+	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125"
 }
 
 adsp() {
@@ -109,8 +112,11 @@ misc() {
 
 	install -Dm644 "$builddir"/osc_rtp_24K_5s.bin -t \
 		"$subpkgdir/lib/firmware/"
+
+        install -Dm644 "$builddir"/focaltech_ts_* -t \
+                "$subpkgdir/lib/firmware/"
 }
 
 sha512sums="
-b2af48f28d3f2ccc7c55938804e82b2393b4d9be0c3f8d832b55093d1241986fc7be0a5844dcf5ff85ceb6d439d62b4ac153ca3a549dc25a24c17ddb1365dd2d  firmware-xiaomi-miatoll-32fa45589a263f131baa8e63b191320d44a6505f.tar.gz
+6bf3a6897537bc111313492bfca3a0f9d6ad64440411df4e652cdcb09ff226592672027a79d0e40b34dc8629de7fd1614dc8c97ae102136e4effd0ad59764003  firmware-xiaomi-miatoll-0f7786f77c794b2bfef3de094135acafbaaef388.tar.gz
 "
