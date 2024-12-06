@@ -1,6 +1,6 @@
 pkgname=firmware-xiaomi-miatoll
 pkgver=1
-pkgrel=2
+pkgrel=6
 pkgdesc="Firmware for Xiaomi Miatoll"
 subpackages="
 	$pkgname-adsp:adsp
@@ -11,30 +11,40 @@ subpackages="
 	$pkgname-wlan:wlan
 	$pkgname-gpu:gpu
 	$pkgname-misc:misc
-	"
+"
 url="https://github.com/99degree/firmware-xiaomi-miatoll"
 arch="aarch64"
 license="proprietary"
-options="!check !strip !archcheck !tracedeps"
+options="!check !strip !archcheck !tracedeps textrels pmb:cross-native"
 _commit="0f7786f77c794b2bfef3de094135acafbaaef388"
 source="$pkgname-$_commit.tar.gz::$url/archive/$_commit/$pkgname-$_commit.tar.gz"
 builddir="$srcdir/$pkgname-$_commit"
+#depends="
+#	firmware-qcom-adreno
+#"
 
 package() {
 	# parent package is empty
 	mkdir -p "$pkgdir"
 
-	mkdir -p "$subpkgdir/lib/firmware/qcom"
-	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125"
+	#mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125"
+	#mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
 adsp() {
 	pkgdesc="Xiaomi Miatoll adsp firmware"
 
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
-
-	install -Dm644 "$builddir"/adsp* -t \
-		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+	_files="
+		adsp.mbn
+		adsps.jsn
+		adspr.jsn
+		adspua.jsn
+	"
+	for f in $_files; do
+		install -Dm644 "$builddir/$f" -t \
+			"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+	done
 }
 
 cdsp() {
@@ -42,8 +52,14 @@ cdsp() {
 
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
-	install -Dm644 "$builddir"/cdsp* -t \
-		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+        _files="
+		cdsp.mbn
+		cdspr.jsn
+        "
+        for f in $_files; do
+                install -Dm644 "$builddir/$f" -t \
+                        "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+        done
 }
 
 ipa() {
@@ -51,7 +67,7 @@ ipa() {
 
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
-	install -Dm644 "$builddir"/ipa_fws.* -t \
+	install -Dm644 "$builddir/ipa_fws.mbn" -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
@@ -60,60 +76,83 @@ modem() {
 
 	# cp because of the modem_pr directory
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
-	cp -r "$builddir"/modem* \
-		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
-	find "$subpkgdir/lib/firmware/qcom/sm7125/miatoll" \
-		-type f -exec chmod 0644 {} \;
+
+        _files="
+                modem.mbn
+                modemr.jsn
+		modemuw.jsn
+        "
+        for f in $_files; do
+                install -Dm644 "$builddir/$f" -t \
+                        "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
+        done
 }
 
 venus() {
 	pkgdesc="Xiaomi Miatoll venus firmware"
 
+	
+
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
-	install -Dm644 "$builddir"/venus.mbn -t \
+	install -Dm644 "$builddir/venus.mbn" -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
 wlan() {
 	pkgdesc="Xiaomi Miatoll wlan firmware"
 
+	
+
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
-	install -Dm644 "$builddir"/wlanmdsp.mbn -t \
+	install -Dm644 "$builddir/wlanmdsp.mbn" -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
 gpu() {
 	pkgdesc="Xiaomi Miatoll gpu firmware"
 
+	
+
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
-	install -Dm644 "$builddir"/a615_zap.mbn -t \
+	install -Dm644 "$builddir/a615_zap.mbn" -t \
 		"$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 }
 
 misc() {
 	pkgdesc="Xiaomi Miatoll misc firmware"
 
+	
+
 	mkdir -p "$subpkgdir/lib/firmware/qcom/sm7125/miatoll"
 
-	install -Dm644 "$builddir"/Drv2624Date.ini -t \
+	install -Dm644 "$builddir/Drv2624Date.ini" -t \
 		"$subpkgdir/lib/firmware/"
 
-	install -Dm644 "$builddir"/aw8624* -t \
+	install -Dm644 "$builddir/aw8624_haptic.bin" -t \
 		"$subpkgdir/lib/firmware/"
 
-	install -Dm644 "$builddir"/drv2624* -t \
+        install -Dm644 "$builddir/aw8624_rtp_1.bin" -t \
+                "$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir/drv2624.rtp" -t \
 		"$subpkgdir/lib/firmware/"
 
-	install -Dm644 "$builddir"/novatek_ts_* -t \
+        install -Dm644 "$builddir/drv2624.bin" -t \
+                "$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir/novatek_ts_tianma_fw.bin" -t \
 		"$subpkgdir/lib/firmware/"
 
-	install -Dm644 "$builddir"/osc_rtp_24K_5s.bin -t \
+        install -Dm644 "$builddir/novatek_ts_tianma_mp.bin" -t \
+                "$subpkgdir/lib/firmware/"
+
+	install -Dm644 "$builddir/osc_rtp_24K_5s.bin" -t \
 		"$subpkgdir/lib/firmware/"
 
-        install -Dm644 "$builddir"/focaltech_ts_* -t \
+        install -Dm644 "$builddir/focaltech_ts_fw_huaxing.bin" -t \
                 "$subpkgdir/lib/firmware/"
 }
 
